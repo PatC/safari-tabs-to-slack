@@ -1,0 +1,139 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<title>Web to Slack</title>
+	<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script type="text/javascript">
+	
+	var slackUrl = safari.extension.settings.slackurl;
+	var slackChannel = safari.extension.settings.slackchannel;
+	var debug = true; 
+	
+	var slackUrlNotSetError = "Set your slack URL in the extensions preferences before using.";
+	var slackChannelNotSetError = "Set your slack channel in the extensions preferences before using.";
+	var slackUnableToSendError = "Unable to send to Slack. Check that the URL is set correctly.";
+
+	function performCommand(event)
+	{		
+	    if (event.command === "sendToSlack") {
+			
+	        var currentURL = event.target.browserWindow.activeTab.url;
+	        if (currentURL)
+				if(sendURLToSlack(event.target.browserWindow.activeTab.url))
+				{
+					event.target.browserWindow.activeTab.close();					
+				}
+	    }
+	}
+
+	function sendURLToSlack(url)
+	{
+		log(url);
+		log("SlackUrl: "+slackUrl);
+		log("SlackChannel:"+slackChannel);
+		
+		//validate slackUrl and slackChannel are set
+		if (typeof slackUrl == 'undefined' || slackUrl == "") 
+		{
+		    alert(slackUrlNotSetError);
+			return false;
+		}
+		if (typeof slackChannel == 'undefined' || slackChannel == "") 
+		{
+		    alert(slackChannelNotSetError);
+			return false;
+		}
+
+		//add a # to the channel name in case they didn't.
+		if(slackChannel.substring(0,1) != "#")
+		{
+			slackChannel = "#" + slackChannel;
+		}
+		
+		var markers = { "channel" : slackChannel, 
+						 "text" : url,
+		 				 "username" : "patbot",
+		 				 "icon_emoji" : ":dart:",
+						 "unfurl_links" : "true" };
+
+		 var xmlhttp = new XMLHttpRequest();   // new HttpRequest instance 
+		 xmlhttp.open("POST", slackUrl);
+		 xmlhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+		 xmlhttp.send(JSON.stringify(markers));
+		 xmlhttp.addEventListener("load", jsonSendComplete);
+		 xmlhttp.addEventListener("error", jsonSendFailed);
+	}
+ 
+ 	function jsonSendComplete(event)
+	{		
+		if(event.target.status != 200)
+		{
+			if(event.target.status == 404)
+			{
+				alert(slackUnableToSendError + " (" + event.currentTarget.status + ": " + event.currentTarget.statusText + ")");
+				return false; 
+			}
+			
+			if(event.target.status == 500)
+			{
+				alert("Encountered a Slack error: " + event.currentTarget.responseText +". Check your settings and try again.");
+				return false;
+			}
+			
+		}
+		else
+		{
+			log('Tab sent to slack.');		
+		}
+		log(event);	
+	}
+	
+	function jsonSendFailed(event)
+	{
+		log('Tab failed to send to slack.');
+		log(event);
+	}
+ 
+	function validateCommand(event)
+	{
+	    if (event.command === "sendToSlack") {
+	        // Disable the button if there is no URL loaded in the tab.
+	        event.target.disabled = !event.target.browserWindow.activeTab.url;
+	    }
+	}
+	
+	function settingsChanged(event) {
+			
+		log(event);
+		
+	    if (event.key == "slackurl") {
+	        slackUrl = event.newValue;
+			log("New slackUrl: " + slackUrl);
+			log("event.newValue: " + event.newValue);
+	    }
+	    if (event.key == "slackchannel") {
+	        slackChannel = event.newValue;
+			log("New slackChannel: " + slackChannel);
+			log("event.newValue: " + event.newValue);
+	    }
+
+	}
+	
+	//logging function you can turn on/off globally.
+	function log(obj)
+	{
+		if(debug)
+		{
+			console.log(obj);
+		}
+	}
+	
+	// if event handlers are in the global HTML page,
+	// register with application:
+	safari.application.addEventListener("command", performCommand, false);
+	safari.application.addEventListener("validate", validateCommand, false);
+	safari.extension.settings.addEventListener("change", settingsChanged, false);
+
+	</script>
+</head>
+</html>
